@@ -3,9 +3,6 @@ require "field_encryptable/version"
 module FieldEncryptable
   extend ActiveSupport::Concern
 
-  PLAINTEXT_LOADED = 1
-  REQUIRE_ENCRIPTION = 2
-
   included do
     before_save do
       self.class
@@ -13,11 +10,10 @@ module FieldEncryptable
         .map { |t| t.try(:attribute_target_columns) }
         .flatten.compact.uniq
         .reject(method(&:require_encrition?))
-        .each
-      do |column|
-        send("encrypted_#{column}=", self.class.encryptor.encrypt_and_sign(self.instance_variable_get("@#{column}")))
-        encripted!(column)
-      end
+        .each do |column|
+          send("encrypted_#{column}=", self.class.encryptor.encrypt_and_sign(self.instance_variable_get("@#{column}")))
+          encripted!(column)
+        end
     end
 
     def attributes
@@ -31,26 +27,23 @@ module FieldEncryptable
     private
 
     def require_encription?(column)
-      0 < (instance_variable_get("@___#{column}_encryption_status") & REQUIRE_ENCRIPTION)
+      instance_variable_get("@___#{column}_require_encription")
     end
 
     def require_encription!(column)
-      varname = "@___#{column}_encryption_status"
-      instance_variable_set(varname, instance_variable_get(varname) | REQUIRE_ENCRIPTION)
+      instance_variable_set("@___#{column}_require_encription", true)
     end
 
     def encripted!(column)
-      varname = "@___#{column}_encryption_status"
-      instance_variable_set(varname, instance_variable_get(varname) & ~REQUIRE_ENCRIPTION)
+      instance_variable_set("@___#{column}_require_encription", nil)
     end
 
     def plaintext_loaded?(column)
-      0 < (instance_variable_get("@___#{column}_encryption_status") & PLAINTEXT_LOADED)
+      instance_variable_get("@___#{column}_plaintext_loaded")
     end
 
     def plaintext_loaded!(column)
-      varname = "@___#{column}_encryption_status"
-      instance_variable_set(varname, instance_variable_get(varname) | PLAINTEXT_LOADED)
+      instance_variable_set("@___#{column}_plaintext_loaded", true)
     end
   end
 
