@@ -5,12 +5,15 @@ module FieldEncryptable
 
   included do
     before_save do
-      columns = self.class.ancestors.map { |t| t.try(:attribute_target_columns) }.reject(&:nil?).flatten.uniq
-      columns.each do |column|
-        next if self.instance_variable_get("@___#{column}_encryption_status").blank?
-        self.send("encrypted_#{column}=", self.class.encryptor.encrypt_and_sign(self.instance_variable_get("@#{column}")))
-        self.instance_variable_set("@___#{column}_encryption_status", false)
-      end
+      self.class
+        .ancestors
+        .map { |t| t.try(:attribute_target_columns) }
+        .flatten.compact.uniq
+        .reject(method(&:require_encrition?))
+        .each do |column|
+          send("encrypted_#{column}=", self.class.encryptor.encrypt_and_sign(self.instance_variable_get("@#{column}")))
+          encripted!(column)
+        end
     end
 
     def attributes
@@ -19,6 +22,28 @@ module FieldEncryptable
         .to_hash
         .delete_if { |k,v| k.start_with?("encrypted_") }
         .merge(columns.map { |t| [t.to_s, self.send(t)] }.to_h)
+    end
+
+    private
+
+    def require_encription?(column)
+      instance_variable_get("@___#{column}_require_encription")
+    end
+
+    def require_encription!(column)
+      instance_variable_set("@___#{column}_require_encription", true)
+    end
+
+    def encripted!(column)
+      instance_variable_set("@___#{column}_require_encription", nil)
+    end
+
+    def plaintext_loaded?(column)
+      instance_variable_get("@___#{column}_plaintext_loaded")
+    end
+
+    def plaintext_loaded!(column)
+      instance_variable_set("@___#{column}_plaintext_loaded", true)
     end
   end
 
@@ -45,8 +70,8 @@ module FieldEncryptable
       self.attribute_target_columns.each do |attr|
         define_method("#{attr}=") do |val|
           attribute_will_change!(attr) if val != self.send(attr)
-          self.instance_variable_set("@#{attr}", val)
-          self.instance_variable_set("@___#{attr}_encryption_status", true)
+          instance_variable_set("@#{attr}", val)
+          plaintext_loaded!(attr)
         end
       end
     end
@@ -56,11 +81,16 @@ module FieldEncryptable
     def define_encrypted_attribute_methods(attr, type = :string)
       define_method("decrypt_#{attr}") do
         begin
-          return self.instance_variable_get("@#{attr}") if self.instance_variable_get("@___#{attr}_encryption_status")
-          self.instance_variable_get("@#{attr}") || self.instance_variable_set("@#{attr}", self.class.encryptor.decrypt_and_verify(read_attribute("encrypted_#{attr}")))
+          return instance_variable_get("@#{attr}") if plaintext_loaded?(attr)
+          if new_record?
+            instance_variable_set("@#{attr}", read_attribute("encrypted_#{attr}")) # load default value
+            require_encription!(attr)
+          else
+            instance_variable_set("@#{attr}", self.class.encryptor.decrypt_and_verify(read_attribute("encrypted_#{attr}")))
+          end
+          plaintext_loaded!(attr)
         rescue
-          val = self.persisted? ? nil : read_attribute("encrypted_#{attr}")
-          self.instance_variable_get("@#{attr}") || self.instance_variable_set("@#{attr}", val)
+          nil
         end
       end
 
