@@ -5,13 +5,8 @@ module FieldEncryptable
 
   included do
     before_save do
-      columns =
-        self
-          .class
-          .ancestors
-          .map { |t| t.try(:attribute_target_columns) }
-          .flatten.compact.uniq
-          .select(&method(:require_encription?))
+      attribute_target_columns.each { |a| send(a) unless plaintext_loaded?(a) } if new_record?
+      columns = attribute_target_columns.select(&method(:require_encription?))
       columns.each do |column|
         send("encrypted_#{column}=", encryptor.encrypt_and_sign(instance_variable_get("@#{column}")))
         encrypted!(column)
@@ -21,25 +16,29 @@ module FieldEncryptable
     alias_method :reload_without_encrypted, :reload
     def reload(*args, &block)
       result = reload_without_encrypted(*args, &block)
-      self
-        .class
-        .ancestors
-        .map { |t| t.try(:attribute_target_columns) }
-        .flatten.compact.uniq
-        .each(&method(:reset_plaintext_loaded!))
+      attribute_target_columns.each(&method(:reset_plaintext_loaded!))
       result
     end
 
     def attributes
-      columns = self.class.ancestors.map { |t| t.try(:attribute_target_columns) }.reject(&:nil?).flatten.uniq
       @attributes
         .to_hash
         .delete_if { |k,v| k.start_with?("encrypted_") }
-        .merge(columns.map { |t| [t.to_s, self.send(t)] }.to_h)
+        .merge(attribute_target_columns.map { |t| [t.to_s, self.send(t)] }.to_h)
     end
 
-    def encryptor
-      self.class.ancestors.map { |a| a.try(:encryptor) }.compact.first
+    def encryptor(cls = self.class)
+      return cls.encryptor if cls.encryptor.present?
+      encryptor(cls.superclass)
+    rescue
+      nil
+    end
+
+    def attribute_target_columns(cls = self.class)
+      return cls.attribute_target_columns if cls.attribute_target_columns.present?
+      attribute_target_columns(cls.superclass)
+    rescue
+      nil
     end
 
     private
