@@ -5,7 +5,7 @@ module FieldEncryptable
 
   included do
     before_save do
-      attribute_target_columns.each { |a| send(a) unless plaintext_loaded?(a) } if new_record?
+      attribute_target_columns.reject(&method(:plaintext_loaded?)).each(&method(:send)) if new_record?
       columns = attribute_target_columns.select(&method(:require_encription?))
       columns.each do |column|
         send("encrypted_#{column}=", encryptor.encrypt_and_sign(instance_variable_get("@#{column}")))
@@ -28,17 +28,14 @@ module FieldEncryptable
     end
 
     def encryptor(cls = self.class)
+      raise "Please set encrypted key!" if cls.try(:encryptor).blank? && cls.superclass.blank?
       return cls.encryptor if cls.encryptor.present?
       encryptor(cls.superclass)
-    rescue
-      nil
     end
 
     def attribute_target_columns(cls = self.class)
       return cls.attribute_target_columns if cls.attribute_target_columns.present?
       attribute_target_columns(cls.superclass)
-    rescue
-      nil
     end
 
     private
