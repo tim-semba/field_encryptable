@@ -5,8 +5,9 @@ module FieldEncryptable
 
   included do
     before_save do
-      attribute_target_columns.reject(&method(:plaintext_loaded?)).each(&method(:send)) if new_record?
-      columns = attribute_target_columns.select(&method(:require_encription?))
+      next if self.class.attribute_target_columns.blank?
+      self.class.attribute_target_columns.reject(&method(:plaintext_loaded?)).each(&method(:send)) if new_record?
+      columns = self.class.attribute_target_columns.select(&method(:require_encription?))
       columns.each do |column|
         send("encrypted_#{column}=", encryptor.encrypt_and_sign(instance_variable_get("@#{column}")))
         encrypted!(column)
@@ -16,7 +17,7 @@ module FieldEncryptable
     alias_method :reload_without_encrypted, :reload
     def reload(*args, &block)
       result = reload_without_encrypted(*args, &block)
-      attribute_target_columns.each(&method(:reset_plaintext_loaded!))
+      search_parent_attribute_target_columns.each(&method(:reset_plaintext_loaded!))
       result
     end
 
@@ -24,18 +25,19 @@ module FieldEncryptable
       @attributes
         .to_hash
         .delete_if { |k,v| k.start_with?("encrypted_") }
-        .merge(attribute_target_columns.map { |t| [t.to_s, self.send(t)] }.to_h)
+        .merge(search_parent_attribute_target_columns.map { |t| [t.to_s, self.send(t)] }.to_h)
     end
 
     def encryptor(cls = self.class)
-      raise "Please set encrypted key!" if cls.try(:encryptor).blank? && cls.superclass.blank?
-      return cls.encryptor if cls.encryptor.present?
+      raise "Please set encrypted key!" if cls.superclass.blank?
+      return cls.try(:encryptor) if cls.try(:encryptor).present?
       encryptor(cls.superclass)
     end
 
-    def attribute_target_columns(cls = self.class)
-      return cls.attribute_target_columns if cls.attribute_target_columns.present?
-      attribute_target_columns(cls.superclass)
+    def search_parent_attribute_target_columns(cls = self.class)
+      return [] if cls.superclass.blank?
+      return cls.try(:attribute_target_columns) if cls.try(:attribute_target_columns).present?
+      search_parent_attribute_target_columns(cls.superclass)
     end
 
     private
