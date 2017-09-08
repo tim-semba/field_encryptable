@@ -29,7 +29,7 @@ module FieldEncryptable
     end
 
     def encryptor(cls = self.class)
-      raise "Please set encrypted key!" if cls.superclass.blank?
+      raise "FieldEncryptable: We must call encrypt_key before use." if cls.superclass.blank?
       return cls.try(:encryptor) if cls.try(:encryptor).present?
       encryptor(cls.superclass)
     end
