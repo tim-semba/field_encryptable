@@ -5,9 +5,9 @@ module FieldEncryptable
 
   included do
     before_save do
-      next if self.class.attribute_target_columns.blank?
-      self.class.attribute_target_columns.reject(&method(:plaintext_loaded?)).map { |t| "decrypt_#{t}" }.each(&method(:send)) if new_record?
-      columns = self.class.attribute_target_columns.select(&method(:require_encription?))
+      next if search_parent_attribute_target_columns.blank?
+      search_parent_attribute_target_columns.reject(&method(:plaintext_loaded?)).map { |t| "decrypt_#{t}" }.each(&method(:send)) if new_record?
+      columns = search_parent_attribute_target_columns.select(&method(:require_encription?))
       columns.each do |column|
         send("encrypted_#{column}=", encryptor.encrypt_and_sign(instance_variable_get("@#{column}")))
         encrypted!(column)
