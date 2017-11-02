@@ -76,7 +76,7 @@ module FieldEncryptable
     end
 
     def encrypt_fields(*attributes)
-      self.attribute_target_columns = []
+      self.attribute_target_columns ||= []
       attributes.each do |attr|
         if [Symbol, String].include?(attr.class)
           define_encrypted_attribute_methods(attr)
