@@ -76,7 +76,6 @@ module FieldEncryptable
     end
 
     def encrypt_fields(*attributes)
-      raise "FieldEncryptable: Do not call encrpyted_fields because encrypted_fields was already called by parent class" if self.superclass.try(:attribute_target_columns).present?
       self.attribute_target_columns = []
       attributes.each do |attr|
         if [Symbol, String].include?(attr.class)
