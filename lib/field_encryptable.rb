@@ -5,9 +5,9 @@ module FieldEncryptable
 
   included do
     before_save do
-      next if search_parent_attribute_target_columns.blank?
-      search_parent_attribute_target_columns.reject(&method(:plaintext_loaded?)).map { |t| "decrypt_#{t}" }.each(&method(:send)) if new_record?
-      columns = search_parent_attribute_target_columns.select(&method(:require_encription?))
+      next if search_parent_encrypt_target_columns.blank?
+      search_parent_encrypt_target_columns.reject(&method(:plaintext_loaded?)).map { |t| "decrypt_#{t}" }.each(&method(:send)) if new_record?
+      columns = search_parent_encrypt_target_columns.select(&method(:require_encription?))
       columns.each do |column|
         send("encrypted_#{column}=", encryptor.encrypt_and_sign(instance_variable_get("@#{column}")))
         encrypted!(column)
@@ -17,7 +17,7 @@ module FieldEncryptable
     alias_method :reload_without_encrypted, :reload
     def reload(*args, &block)
       result = reload_without_encrypted(*args, &block)
-      search_parent_attribute_target_columns.each(&method(:reset_plaintext_loaded!))
+      search_parent_encrypt_target_columns.each(&method(:reset_plaintext_loaded!))
       result
     end
 
@@ -25,7 +25,7 @@ module FieldEncryptable
       @attributes
         .to_hash
         .delete_if { |k,v| k.start_with?("encrypted_") }
-        .merge(search_parent_attribute_target_columns.map { |t| [t.to_s, self.send(t)] }.to_h)
+        .merge(search_parent_encrypt_target_columns.map { |t| [t.to_s, self.send(t)] }.to_h)
     end
 
     def encryptor(cls = self.class)
@@ -34,10 +34,10 @@ module FieldEncryptable
       encryptor(cls.superclass)
     end
 
-    def search_parent_attribute_target_columns(cls = self.class)
+    def search_parent_encrypt_target_columns(cls = self.class)
       return [] if cls.superclass.blank?
-      return cls.try(:attribute_target_columns) if cls.try(:attribute_target_columns).present?
-      search_parent_attribute_target_columns(cls.superclass)
+      return cls.try(:encrypt_target_columns) if cls.try(:encrypt_target_columns).present?
+      search_parent_encrypt_target_columns(cls.superclass)
     end
 
     private
@@ -68,7 +68,7 @@ module FieldEncryptable
   end
 
   module ClassMethods
-    attr_accessor :attribute_target_columns
+    attr_accessor :encrypt_target_columns
     attr_reader :encryptor
 
     def encrypt_key(key)
@@ -76,18 +76,18 @@ module FieldEncryptable
     end
 
     def encrypt_fields(*attributes)
-      self.attribute_target_columns ||= []
+      self.encrypt_target_columns ||= []
       attributes.each do |attr|
         if [Symbol, String].include?(attr.class)
           define_encrypted_attribute_methods(attr)
-          self.attribute_target_columns << attr
+          self.encrypt_target_columns << attr
         elsif attr.instance_of?(Hash)
-          self.attribute_target_columns.concat(attr.keys)
+          self.encrypt_target_columns.concat(attr.keys)
           attr.each { |k,v| define_encrypted_attribute_methods(k, v) }
         end
       end
 
-      self.attribute_target_columns.each do |attr|
+      self.encrypt_target_columns.each do |attr|
         define_method("#{attr}=") do |val|
           attribute_will_change!(attr) if val != self.send(attr)
           instance_variable_set("@#{attr}", val)
@@ -137,6 +137,9 @@ module FieldEncryptable
             self.send("decrypt_#{attr}").try(:to_datetime)
           when :integer
             self.send("decrypt_#{attr}").try(:to_i)
+          when :boolean
+            attr_val = self.send("decrypt_#{attr}")
+            [true, false, nil].include?(attr_val) ? attr_val : 5 <= Rails::VERSION::MAJOR
           else
             self.send("decrypt_#{attr}")
           end
