@@ -139,7 +139,7 @@ module FieldEncryptable
             self.send("decrypt_#{attr}").try(:to_i)
           when :boolean
             attr_val = self.send("decrypt_#{attr}")
-            [true, false, nil].include?(attr_val) ? attr_val : Rails.version.to_f >= 5.0
+            [true, false, nil].include?(attr_val) ? attr_val : 5 <= Rails::VERSION::MAJOR
           else
             self.send("decrypt_#{attr}")
           end
