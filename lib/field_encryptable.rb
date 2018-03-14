@@ -112,6 +112,7 @@ module FieldEncryptable
           plaintext_loaded!(attr)
           instance_variable_get("@#{attr}")
         rescue
+          plaintext_loaded!(attr)
           nil
         end
       end
