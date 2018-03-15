@@ -100,20 +100,20 @@ module FieldEncryptable
 
     def define_encrypted_attribute_methods(attr, type = :string)
       define_method("decrypt_#{attr}") do
-        begin
-          return instance_variable_get("@#{attr}") if plaintext_loaded?(attr)
+        return instance_variable_get("@#{attr}") if plaintext_loaded?(attr)
 
-          if new_record?
-            instance_variable_set("@#{attr}", read_attribute("encrypted_#{attr}"))
-            require_encription!(attr)
-          else
-            instance_variable_set("@#{attr}", encryptor.decrypt_and_verify(read_attribute("encrypted_#{attr}")))
+        if new_record?
+          instance_variable_set("@#{attr}", read_attribute("encrypted_#{attr}"))
+          require_encription!(attr)
+        else
+          instance_variable_set "@#{attr}", begin
+            encryptor.decrypt_and_verify(read_attribute("encrypted_#{attr}"))
+          rescue
+            nil
           end
-          plaintext_loaded!(attr)
-          instance_variable_get("@#{attr}")
-        rescue
-          nil
         end
+        plaintext_loaded!(attr)
+        instance_variable_get("@#{attr}")
       end
 
       define_method("#{attr}_was") do
