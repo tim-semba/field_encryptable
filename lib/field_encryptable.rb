@@ -72,7 +72,7 @@ module FieldEncryptable
     attr_reader :encryptor
 
     def encrypt_key(key)
-      @encryptor = ActiveSupport::MessageEncryptor.new(key.to_s)
+      @encryptor = ActiveSupport::MessageEncryptor.new(key.to_s[0..31], key.to_s)
     end
 
     def encrypt_fields(*attributes)
