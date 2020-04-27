@@ -13,58 +13,56 @@ module FieldEncryptable
         encrypted!(column)
       end
     end
+  end
 
-    alias_method :reload_without_encrypted, :reload
-    def reload(*args, &block)
-      result = reload_without_encrypted(*args, &block)
-      search_parent_encrypt_target_columns.each(&method(:reset_plaintext_loaded!))
-      result
-    end
+  def reload(*)
+    search_parent_encrypt_target_columns.each(&method(:reset_plaintext_loaded!))
+    super
+  end
 
-    def attributes
-      @attributes
-        .to_hash
-        .delete_if { |k,v| k.start_with?("encrypted_") }
-        .merge(search_parent_encrypt_target_columns.map { |t| [t.to_s, self.send(t)] }.to_h)
-    end
+  def attributes
+    @attributes
+      .to_hash
+      .delete_if { |k,v| k.start_with?("encrypted_") }
+      .merge(search_parent_encrypt_target_columns.map { |t| [t.to_s, self.send(t)] }.to_h)
+  end
 
-    def encryptor(cls = self.class)
-      raise "FieldEncryptable: We must call encrypt_key before use." if cls.superclass.blank?
-      return cls.try(:encryptor) if cls.try(:encryptor).present?
-      encryptor(cls.superclass)
-    end
+  def encryptor(cls = self.class)
+    raise "FieldEncryptable: We must call encrypt_key before use." if cls.superclass.blank?
+    return cls.try(:encryptor) if cls.try(:encryptor).present?
+    encryptor(cls.superclass)
+  end
 
-    def search_parent_encrypt_target_columns(cls = self.class)
-      return [] if cls.superclass.blank?
-      return cls.try(:encrypt_target_columns) if cls.try(:encrypt_target_columns).present?
-      search_parent_encrypt_target_columns(cls.superclass)
-    end
+  def search_parent_encrypt_target_columns(cls = self.class)
+    return [] if cls.superclass.blank?
+    return cls.try(:encrypt_target_columns) if cls.try(:encrypt_target_columns).present?
+    search_parent_encrypt_target_columns(cls.superclass)
+  end
 
-    private
+  private
 
-    def require_encription?(column)
-      instance_variable_get("@___#{column}_require_encription")
-    end
+  def require_encription?(column)
+    instance_variable_get("@___#{column}_require_encription")
+  end
 
-    def require_encription!(column)
-      instance_variable_set("@___#{column}_require_encription", true)
-    end
+  def require_encription!(column)
+    instance_variable_set("@___#{column}_require_encription", true)
+  end
 
-    def encrypted!(column)
-      instance_variable_set("@___#{column}_require_encription", nil)
-    end
+  def encrypted!(column)
+    instance_variable_set("@___#{column}_require_encription", nil)
+  end
 
-    def plaintext_loaded?(column)
-      instance_variable_get("@___#{column}_plaintext_loaded")
-    end
+  def plaintext_loaded?(column)
+    instance_variable_get("@___#{column}_plaintext_loaded")
+  end
 
-    def plaintext_loaded!(column)
-      instance_variable_set("@___#{column}_plaintext_loaded", true)
-    end
+  def plaintext_loaded!(column)
+    instance_variable_set("@___#{column}_plaintext_loaded", true)
+  end
 
-    def reset_plaintext_loaded!(column)
-      instance_variable_set("@___#{column}_plaintext_loaded", nil)
-    end
+  def reset_plaintext_loaded!(column)
+    instance_variable_set("@___#{column}_plaintext_loaded", nil)
   end
 
   module ClassMethods
