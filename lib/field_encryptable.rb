@@ -67,10 +67,14 @@ module FieldEncryptable
 
   module ClassMethods
     attr_accessor :encrypt_target_columns
-    attr_reader :encryptor
 
     def encrypt_key(key)
-      @encryptor = ActiveSupport::MessageEncryptor.new(key.to_s[0..31], key.to_s)
+      @key = key.to_s
+    end
+
+    def encryptor
+      return if @key.blank?
+      @encryptor ||= ActiveSupport::MessageEncryptor.new(@key[0..31], @key)
     end
 
     def encrypt_fields(*attributes)
